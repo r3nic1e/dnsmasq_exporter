@@ -22,6 +22,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 
 	"golang.org/x/sync/errgroup"
 
@@ -76,12 +77,12 @@ var (
 			Name: "dnsmasq_hits",
 			Help: "DNS queries answered locally (cache hits)",
 		}),
-
-		"auth.bind.": prometheus.NewGauge(prometheus.GaugeOpts{
-			Name: "dnsmasq_auth",
-			Help: "DNS queries for authoritative zones",
-		}),
 	}
+
+	upstreams = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "dnsmasq_auth",
+		Help: "DNS queries for authoritative zones",
+	}, []string{"status", "server"})
 
 	leases = prometheus.NewGauge(prometheus.GaugeOpts{
 		Name: "dnsmasq_leases",
@@ -93,6 +94,7 @@ func init() {
 	for _, g := range floatMetrics {
 		prometheus.MustRegister(g)
 	}
+	prometheus.MustRegister(upstreams)
 	prometheus.MustRegister(leases)
 }
 
@@ -142,6 +144,16 @@ func (s *server) metrics(w http.ResponseWriter, r *http.Request) {
 			switch txt.Hdr.Name {
 			case "servers.bind.":
 				// TODO: parse <server> <successes> <errors>, also with multiple upstreams
+				for _, line := range txt.Txt {
+					tokens := strings.Split(line, " ")
+					server := tokens[0]
+					if success, err := strconv.ParseFloat(tokens[1], 32); err == nil {
+						upstreams.With(prometheus.Labels{"server": server, "status": "success"}).Set(success)
+					}
+					if error, err := strconv.ParseFloat(tokens[1], 32); err == nil {
+						upstreams.With(prometheus.Labels{"server": server, "status": "error"}).Set(error)
+					}
+				}
 			default:
 				g, ok := floatMetrics[txt.Hdr.Name]
 				if !ok {
