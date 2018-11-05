@@ -150,7 +150,7 @@ func (s *server) metrics(w http.ResponseWriter, r *http.Request) {
 					if success, err := strconv.ParseFloat(tokens[1], 32); err == nil {
 						upstreams.With(prometheus.Labels{"server": server, "status": "success"}).Set(success)
 					}
-					if error, err := strconv.ParseFloat(tokens[1], 32); err == nil {
+					if error, err := strconv.ParseFloat(tokens[2], 32); err == nil {
 						upstreams.With(prometheus.Labels{"server": server, "status": "error"}).Set(error)
 					}
 				}
